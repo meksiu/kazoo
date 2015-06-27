@@ -399,8 +399,8 @@ jobj_to_auth_user(JObj, Username, Realm, Req) ->
                           ,account_id = get_account_id(AuthDoc)
                           ,account_db = get_account_db(AuthDoc)
                           ,password = wh_json:get_value(<<"password">>, AuthValue, wh_util:rand_hex_binary(6))
-                          ,authorizing_type = wh_json:get_value(<<"pvt_type">>, AuthDoc, <<"anonymous">>)
-                          ,authorizing_id = wh_json:get_value(<<"id">>, JObj)
+                          ,authorizing_type = wh_doc:type(AuthDoc, <<"anonymous">>)
+                          ,authorizing_id = wh_doc:id(JObj)
                           ,method = wh_util:to_lower_binary(Method)
                           ,owner_id = wh_json:get_value(<<"owner_id">>, AuthDoc)
                           ,suppress_unregister_notifications = wh_json:is_true(<<"suppress_unregister_notifications">>, AuthDoc)
@@ -430,9 +430,9 @@ add_account_name(#auth_user{account_id=AccountId}=AuthUser, AccountDb) ->
     case couch_mgr:open_cache_doc(AccountDb, AccountId) of
         {'error', _} -> AuthUser;
         {'ok', Account} ->
-            AuthUser#auth_user{account_name=wh_json:get_value(<<"name">>, Account)
-                               ,account_realm=wh_json:get_value(<<"realm">>, Account)
-                               ,account_normalized_realm=wh_json:get_lower_binary(<<"realm">>, Account)
+            AuthUser#auth_user{account_name = kz_account:name(Account)
+                               ,account_realm = kz_account:realm(Account)
+                               ,account_normalized_realm = wh_json:get_lower_binary(<<"realm">>, Account)
                               }
     end.
 
@@ -551,14 +551,9 @@ gsm_auth(AuthUser) -> {'ok', AuthUser}.
 %%-----------------------------------------------------------------------------
 -spec get_account_id(wh_json:object()) -> api_binary().
 get_account_id(JObj) ->
-    case wh_json:get_first_defined([[<<"doc">>, <<"pvt_account_id">>]
-                                    ,<<"pvt_account_id">>
-                                    ,[<<"doc">>, <<"pvt_account_db">>]
-                                    ,<<"pvt_account_db">>
-                                   ], JObj)
-    of
+    case get_account_db(JObj) of
         'undefined' -> 'undefined';
-        AccountId -> wh_util:format_account_id(AccountId, 'raw')
+        AccountDb -> wh_util:format_account_id(AccountDb, 'raw')
     end.
 
 %%-----------------------------------------------------------------------------
@@ -588,19 +583,12 @@ encryption_method_map(Props, []) -> Props;
 encryption_method_map(Props, [Method|Methods]) ->
     case props:get_value(Method, ?ENCRYPTION_MAP, []) of
         [] -> encryption_method_map(Props, Methods);
-        Values ->
-            encryption_method_map(props:set_values(Values, Props), Methods)
+        Values -> encryption_method_map(props:set_values(Values, Props), Methods)
     end;
 encryption_method_map(Props, JObj) ->
-    encryption_method_map(Props
-                          ,wh_json:get_value([<<"media">>
-                                              ,<<"encryption">>
-                                              ,<<"methods">>
-                                             ]
-                                             ,JObj
-                                             ,[]
-                                            )
-                         ).
+    Key = [<<"media">>, <<"encryption">>, <<"methods">>],
+    Methods = wh_json:get_value(Key, JObj, []),
+    encryption_method_map(Props, Methods).
 
 -spec generate_security_ccvs(auth_user()) -> wh_proplist().
 -spec generate_security_ccvs(auth_user(), wh_proplist()) -> wh_proplist().
