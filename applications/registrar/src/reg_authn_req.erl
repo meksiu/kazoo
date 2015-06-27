@@ -417,17 +417,8 @@ get_auth_value(JObj) ->
                               ], JObj).
 
 -spec add_account_name(auth_user()) -> auth_user().
-add_account_name(#auth_user{account_id=AccountId
-                            ,account_db='undefined'
-                           }=AuthUser
-                ) ->
-    add_account_name(AuthUser, wh_util:format_account_id(AccountId, 'encoded'));
-add_account_name(#auth_user{account_db=AccountDb}=AuthUser) ->
-    add_account_name(AuthUser, AccountDb).
-
--spec add_account_name(auth_user(), ne_binary()) -> auth_user().
-add_account_name(#auth_user{account_id=AccountId}=AuthUser, AccountDb) ->
-    case couch_mgr:open_cache_doc(AccountDb, AccountId) of
+add_account_name(#auth_user{account_id=AccountId}=AuthUser) ->
+    case kz_account:fetch(AccountId) of
         {'error', _} -> AuthUser;
         {'ok', Account} ->
             AuthUser#auth_user{account_name = kz_account:name(Account)
@@ -449,7 +440,7 @@ get_auth_method(JObj) ->
 
 -spec maybe_auth_method(auth_user(), wh_json:object(), wh_json:object(), ne_binary()) ->
                                {'ok', auth_user()} |
-                               {'error', any()}.
+                               {'error', _}.
 maybe_auth_method(AuthUser, JObj, Req, ?GSM_ANY_METHOD)->
     GsmDoc = wh_json:get_value(<<"gsm">>, JObj),
     CachedNonce = wh_json:get_value(<<"nonce">>, GsmDoc, wh_util:rand_hex_binary(16)),
