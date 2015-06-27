@@ -119,8 +119,8 @@
 %%--------------------------------------------------------------------
 -spec start_link(pid(), wh_json:object()) -> startlink_ret().
 start_link(Super, QueueJObj) ->
-    AccountId = wh_json:get_value(<<"pvt_account_id">>, QueueJObj),
-    QueueId = wh_json:get_value(<<"_id">>, QueueJObj),
+    AccountId = wh_doc:account_id(QueueJObj),
+    QueueId = wh_doc:id(QueueJObj),
 
     gen_listener:start_link(?MODULE
                             ,[{'bindings', ?BINDINGS(AccountId, QueueId)}
@@ -234,10 +234,7 @@ should_ignore_member_call(Srv, Call, CallJObj) ->
                               ,wh_json:get_value(<<"Queue-ID">>, CallJObj)
                              ).
 should_ignore_member_call(Srv, Call, AccountId, QueueId) ->
-    K = make_ignore_key(AccountId
-                        ,QueueId
-                        ,whapps_call:call_id(Call)
-                       ),
+    K = make_ignore_key(AccountId, QueueId, whapps_call:call_id(Call)),
     gen_listener:call(Srv, {'should_ignore_member_call', K}).
 
 -spec config(pid()) -> {ne_binary(), ne_binary()}.
@@ -273,8 +270,8 @@ pick_winner(Srv, Resps) -> pick_winner(Srv, Resps, strategy(Srv), next_winner(Sr
 %% @end
 %%--------------------------------------------------------------------
 init([Super, QueueJObj]) ->
-    AccountId = wh_json:get_value(<<"pvt_account_id">>, QueueJObj),
-    QueueId = wh_json:get_value(<<"_id">>, QueueJObj),
+    AccountId = wh_doc:account_id(QueueJObj),
+    QueueId = wh_doc:id(QueueJObj),
 
     put('callid', <<"mgr_", QueueId/binary>>),
 
@@ -291,14 +288,14 @@ init([Super, AccountId, QueueId]) ->
 init(Super, AccountId, QueueId, QueueJObj) ->
     process_flag('trap_exit', 'false'),
 
-    AcctDb = wh_util:format_account_id(AccountId, 'encoded'),
-    couch_mgr:cache_db_doc(AcctDb, QueueId, QueueJObj),
+    AccountDb = wh_util:format_account_id(AccountId, 'encoded'),
+    couch_mgr:cache_db_doc(AccountDb, QueueId, QueueJObj),
 
     _ = start_secondary_queue(AccountId, QueueId),
 
     gen_listener:cast(self(), {'start_workers'}),
     Strategy = get_strategy(wh_json:get_value(<<"strategy">>, QueueJObj)),
-    StrategyState = create_strategy_state(Strategy, AcctDb, QueueId),
+    StrategyState = create_strategy_state(Strategy, AccountDb, QueueId),
 
     _ = update_strategy_state(self(), Strategy, StrategyState),
 
@@ -404,10 +401,11 @@ handle_cast({'member_call_cancel', K, JObj}, #state{ignored_member_calls=Dict}=S
                   ignored_member_calls=dict:store(K, 'true', Dict)
                  }};
 handle_cast({'monitor_call', Call}, State) ->
-    gen_listener:add_binding(self(), 'call', [{'callid', whapps_call:call_id(Call)}
+    CallId = whapps_call:call_id(Call),
+    gen_listener:add_binding(self(), 'call', [{'callid', CallId}
                                               ,{'restrict_to', [<<"CHANNEL_DESTROY">>]}
                                              ]),
-    lager:debug("bound for call events for ~s", [whapps_call:call_id(Call)]),
+    lager:debug("bound for call events for ~s", [CallId]),
     {'noreply', State};
 handle_cast({'start_workers'}, #state{account_id=AccountId
                                       ,queue_id=QueueId
@@ -727,7 +725,7 @@ create_strategy_state('rr', AgentQ, AcctDb, QueueId) ->
         {'ok', []} -> lager:debug("no agents around"), AgentQ;
         {'ok', JObjs} ->
             Q = queue:from_list([Id || JObj <- JObjs,
-                                       not queue:member((Id = wh_json:get_value(<<"id">>, JObj)), AgentQ)
+                                       not queue:member((Id = wh_doc:id(JObj)), AgentQ)
                                 ]),
             queue:join(AgentQ, Q);
         {'error', _E} -> lager:debug("error creating strategy rr: ~p", [_E]), AgentQ
@@ -739,7 +737,7 @@ create_strategy_state('mi', AgentL, AcctDb, QueueId) ->
         {'ok', []} -> lager:debug("no agents around"), AgentL;
         {'ok', JObjs} ->
             lists:foldl(fun(JObj, Acc) ->
-                                Id = wh_json:get_value(<<"id">>, JObj),
+                                Id = wh_doc:id(JObj),
                                 case lists:member(Id, Acc) of
                                     'true' -> Acc;
                                     'false' -> [Id | Acc]
