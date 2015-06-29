@@ -53,8 +53,6 @@ root_dir(Path) ->
 file_exists(Filename) ->
     case file:read_file_info(Filename) of
         {ok, _}         -> 'true';
-        {error, enoent} -> 'false';
-        {error, Reason} -> 'false';
         _ -> 'false'
     end.
     
