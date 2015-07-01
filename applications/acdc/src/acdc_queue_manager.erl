@@ -273,12 +273,12 @@ init([Super, QueueJObj]) ->
     AccountId = wh_doc:account_id(QueueJObj),
     QueueId = wh_doc:id(QueueJObj),
 
-    put('callid', <<"mgr_", QueueId/binary>>),
+    wh_util:put_callid(<<"mgr_", QueueId/binary>>),
 
     init(Super, AccountId, QueueId, QueueJObj);
 
 init([Super, AccountId, QueueId]) ->
-    put('callid', <<"mgr_", QueueId/binary>>),
+    wh_util:put_callid(<<"mgr_", QueueId/binary>>),
 
     AcctDb = wh_util:format_account_id(AccountId, 'encoded'),
     {'ok', QueueJObj} = couch_mgr:open_cache_doc(AcctDb, QueueId),
