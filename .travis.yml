@@ -28,9 +28,10 @@ after_success:
   - kerl_deactivate
   - source $HOME/otp/R16B/activate
   - make build-plt
+  - bash -c "[[ $TRAVIS_PULL_REQUEST != false ]] && curl https://patch-diff.githubusercontent.com/raw/$TRAVIS_REPO_SLUG/pull/$TRAVIS_PULL_REQUEST.patch -s | head -n 1 | cut -d ' ' -f 2"
   - first_commit=$(bash -c "[[ $TRAVIS_PULL_REQUEST != false ]] && curl https://patch-diff.githubusercontent.com/raw/$TRAVIS_REPO_SLUG/pull/$TRAVIS_PULL_REQUEST.patch -s | head -n 1 | cut -d ' ' -f 2")
   - echo .$first_commit.
-  - files=$(bash -c "if [[ $TRAVIS_PULL_REQUEST != false ]]; then git diff --name-only $first_commit.. | grep -v deps/ ; else git fetch origin master:master >/dev/null && git diff --name-only master.. | grep -v deps/ ; fi")
+  - bash -c "if [[ $TRAVIS_PULL_REQUEST != false ]]; then git diff --name-only $first_commit.. | grep -v deps/ ; else git fetch origin master:master >/dev/null && git diff --name-only master.. | grep -v deps/ ; fi"
   - echo .$files.
   - $TRAVIS_BUILD_DIR/scripts/check-dialyzer.escript $files
   - kerl_deactivate
