@@ -386,7 +386,7 @@ maybe_save_category(Category, JObj, Looped) ->
     lager:debug("updating configuration category ~s(~s)", [Category, wh_doc:revision(JObj)]),
     JObj1 =
         wh_doc:update_pvt_parameters(
-          wh_json:set_value(<<"_id">>, Category, JObj)
+          wh_doc:set_id(JObj, Category)
           ,?WH_CONFIG_DB
           ,[{'type', <<"config">>}]
          ),
